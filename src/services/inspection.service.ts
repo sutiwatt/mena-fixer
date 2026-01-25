@@ -1,6 +1,7 @@
 import { authService } from './auth.service';
+import { env } from '../utils/env';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = env.VITE_API_URL;
 const BASE_URL = API_URL;
 
 // Types

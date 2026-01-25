@@ -20,8 +20,26 @@ RUN npm run build
 # Stage 2: Serve with nginx
 FROM nginx:alpine
 
+# Install sed for entrypoint script
+RUN apk add --no-cache sed
+
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Ensure config.js exists (it should be copied from public/ during build)
+# If not, create it from template
+RUN if [ ! -f /usr/share/nginx/html/config.js ]; then \
+    echo "// Runtime configuration - will be injected by entrypoint script" > /usr/share/nginx/html/config.js && \
+    echo "window.__ENV__ = {" >> /usr/share/nginx/html/config.js && \
+    echo "  VITE_API_URL: '{{VITE_API_URL}}'," >> /usr/share/nginx/html/config.js && \
+    echo "  VITE_API_URL_MAINTENANCE: '{{VITE_API_URL_MAINTENANCE}}'," >> /usr/share/nginx/html/config.js && \
+    echo "  VITE_IMAGE_API_URL: '{{VITE_IMAGE_API_URL}}'," >> /usr/share/nginx/html/config.js && \
+    echo "};" >> /usr/share/nginx/html/config.js; \
+    fi
+
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Copy nginx configuration for SPA routing
 RUN echo 'server { \
@@ -42,6 +60,6 @@ RUN echo 'server { \
 # Expose port 8080 (Cloud Run default)
 EXPOSE 8080
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Use entrypoint script to inject environment variables
+ENTRYPOINT ["/entrypoint.sh"]
 

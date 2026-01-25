@@ -622,7 +622,7 @@ export default function DetailRepair() {
                                             <input
                                               type="file"
                                               accept="image/*"
-                                              // ไม่ใส่ capture attribute เพื่อให้สามารถเลือกระหว่างกล้องและ gallery ได้
+                                              capture="environment"
                                               className="hidden"
                                               onChange={(e) => {
                                                 const file = e.target.files?.[0];

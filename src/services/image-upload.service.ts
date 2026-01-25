@@ -1,4 +1,6 @@
-const IMAGE_API_URL = import.meta.env.VITE_IMAGE_API_URL || '';
+import { env } from '../utils/env';
+
+const IMAGE_API_URL = env.VITE_IMAGE_API_URL;
 
 // Types
 export interface PresignUploadRequest {

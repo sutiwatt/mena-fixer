@@ -165,7 +165,7 @@ export default function Inspection() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
-      // ไม่ใส่ capture attribute เพื่อให้สามารถเลือกระหว่างกล้องและ gallery ได้
+      input.capture = 'environment'; // เปิดกล้องโดยตรง (กล้องหลัง) แต่ยังสามารถเลือกจาก gallery ได้
       input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {

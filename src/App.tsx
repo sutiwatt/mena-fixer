@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Inspection from './pages/Inspection';
 import Repair from './pages/Repair';
 import DetailRepair from './pages/DetailRepair';
+import RepairSummary from './pages/RepairSummary';
 import Tire from './pages/Tire';
 import Photo from './pages/Photo';
 import Layout from './components/Layout';
@@ -43,6 +44,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <DetailRepair />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/repair-summary"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <RepairSummary />
                 </Layout>
               </ProtectedRoute>
             }

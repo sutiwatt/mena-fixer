@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { env } from '../utils/env';
+
+const API_URL = env.VITE_API_URL;
 const BASE_URL = API_URL;
 
 const STORAGE_KEYS = {

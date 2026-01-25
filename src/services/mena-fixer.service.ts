@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL_MAINTENANCE || 'http://127.0.0.1:8000';
+import { env } from '../utils/env';
+
+const API_URL = env.VITE_API_URL_MAINTENANCE;
 const BASE_URL = API_URL;
 
 // Types
@@ -158,6 +160,19 @@ export interface MaintenanceRepairRecordUpdateResponse {
   record: MaintenanceRepairRecordResponse;
 }
 
+export interface MaintenanceTaskItem {
+  id: number;
+  problem: string;
+}
+
+export interface MaintenanceTasksBatchRequest {
+  maintenance_requests: string[];
+}
+
+export interface MaintenanceTasksBatchResponse {
+  results: Record<string, MaintenanceTaskItem[]>;
+}
+
 // API call helper (no authentication required)
 const apiCall = async <T>(
   endpoint: string,
@@ -184,6 +199,7 @@ const apiCall = async <T>(
 // Mechanic name mapping for dev/test
 const MECHANIC_NAME_MAP: Record<string, string> = {
   'sutiwatt': 'สันติ สุขดี',
+  'mena': 'สันติ สุขดี',
   // Add more mappings here as needed
 };
 
@@ -271,6 +287,20 @@ export const menaFixerService = {
       {
         method: 'PATCH',
         body: JSON.stringify(request),
+      }
+    );
+  },
+  // Get maintenance tasks by multiple request codes (batch)
+  getMaintenanceTasksByRequests: async (
+    maintenanceRequests: string[]
+  ): Promise<MaintenanceTasksBatchResponse> => {
+    return apiCall<MaintenanceTasksBatchResponse>(
+      '/mena-fixer/maintenance-tasks/batch',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          maintenance_requests: maintenanceRequests,
+        }),
       }
     );
   },

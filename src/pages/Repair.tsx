@@ -5,7 +5,7 @@ import { menaFixerService, MaintenanceRequest, getMechanicName } from '../servic
 import { CustomerPlantAutocomplete } from '../components/CustomerPlantAutocomplete';
 import { TruckAutocompleteInput } from '../components/TruckAutocompleteInput';
 import { inspectionService, TruckResponse } from '../services/inspection.service';
-import { Wrench, Loader2, Calendar, User, Building2, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Truck, Filter, ChevronDown, ChevronUp, X, ArrowUpDown } from 'lucide-react';
+import { Wrench, Loader2, Calendar, User, Building2, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Truck, Filter, ChevronDown, ChevronUp, X, ArrowUpDown, CheckSquare, Square } from 'lucide-react';
 
 export default function Repair() {
   const navigate = useNavigate();
@@ -29,6 +29,8 @@ export default function Repair() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // asc = เก่า→ใหม่, desc = ใหม่→เก่า
   const [activeTab, setActiveTab] = useState<'pending' | 'in_progress' | 'completed'>('pending');
   const [taskCounts, setTaskCounts] = useState<Record<string, number>>({}); // {code: totalTasks}
+  const [isSelectionMode, setIsSelectionMode] = useState(false); // โหมดเลือก card
+  const [selectedRequestCodes, setSelectedRequestCodes] = useState<Set<string>>(new Set()); // เก็บ code ของ card ที่เลือก
   const limit = 20;
 
   // ดึง API เฉพาะเมื่อ filter อื่นๆ เปลี่ยน (ไม่ใช่เมื่อเปลี่ยน tab)
@@ -268,7 +270,93 @@ export default function Repair() {
   };
 
   const handleCardClick = (requestCode: string) => {
+    if (isSelectionMode) {
+      // ถ้าอยู่ในโหมดเลือก ให้ toggle การเลือกแทน
+      setSelectedRequestCodes((prev) => {
+        const newSet = new Set(prev);
+        if (newSet.has(requestCode)) {
+          newSet.delete(requestCode);
+        } else {
+          newSet.add(requestCode);
+        }
+        return newSet;
+      });
+    } else {
     navigate(`/repair/${requestCode}`);
+    }
+  };
+
+  const handleToggleSelection = (requestCode: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // ป้องกันการ trigger handleCardClick
+    setSelectedRequestCodes((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(requestCode)) {
+        newSet.delete(requestCode);
+      } else {
+        newSet.add(requestCode);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (maintenanceRequests.length === 0) {
+      return;
+    }
+    
+    const currentPageCodes = new Set(maintenanceRequests.map((req) => req.code));
+    const allSelected = Array.from(selectedRequestCodes).every((code) => currentPageCodes.has(code)) && 
+                        currentPageCodes.size > 0 &&
+                        selectedRequestCodes.size >= currentPageCodes.size;
+    
+    if (allSelected) {
+      // ถ้าเลือกทั้งหมดในหน้านี้แล้ว ให้ยกเลิกทั้งหมดในหน้านี้
+      setSelectedRequestCodes((prev) => {
+        const newSet = new Set(prev);
+        currentPageCodes.forEach((code) => newSet.delete(code));
+        return newSet;
+      });
+    } else {
+      // เลือกทั้งหมดในหน้านี้
+      setSelectedRequestCodes((prev) => {
+        const newSet = new Set(prev);
+        currentPageCodes.forEach((code) => newSet.add(code));
+        return newSet;
+      });
+    }
+  };
+
+  const handleConfirmSelection = async () => {
+    if (selectedRequestCodes.size === 0) {
+      return;
+    }
+
+    // เก็บ maintenance request objects ที่เลือกไว้ (ไม่ใช่แค่ codes)
+    const selectedRequests = allMaintenanceRequests.filter((req) => 
+      selectedRequestCodes.has(req.code)
+    );
+    
+    // เรียงลำดับตาม selectedRequestCodes
+    const selectedCodes = Array.from(selectedRequestCodes);
+    const sortedRequests = selectedCodes
+      .map((code) => selectedRequests.find((req) => req.code === code))
+      .filter((req): req is MaintenanceRequest => req !== undefined);
+
+    // พาไปหน้าสรุปอาการซ่อม พร้อมส่งข้อมูล maintenance requests ที่เลือกไป
+    navigate('/repair-summary', { 
+      state: { 
+        selectedCodes,
+        selectedRequests: sortedRequests
+      } 
+    });
+  };
+
+  const handleToggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    if (isSelectionMode) {
+      // ถ้าปิดโหมดเลือก ให้ล้างการเลือกทั้งหมด
+      setSelectedRequestCodes(new Set());
+    }
   };
 
   return (
@@ -352,6 +440,8 @@ export default function Repair() {
                 </span>
               </button>
             </div>
+
+            
 
             {showAdvancedFilters && (
               <div className="mt-3 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
@@ -533,6 +623,68 @@ export default function Repair() {
             )}
           </div>
 
+          {/* Selection Mode Toggle */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between gap-4">
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">ดูรายการซ่อม</span>
+                <span className="relative inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={isSelectionMode}
+                    onChange={handleToggleSelectionMode}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer-checked:bg-orange-500 transition-colors peer-focus:ring-2 ring-orange-200 dark:ring-orange-600"></div>
+                  <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+                </span>
+              </label>
+              {isSelectionMode && (
+                <div className="flex items-center gap-2">
+                <button
+                    onClick={handleSelectAll}
+                    disabled={maintenanceRequests.length === 0}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      maintenanceRequests.length === 0
+                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                        : 'text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {(() => {
+                      const currentPageCodes = new Set(maintenanceRequests.map((req) => req.code));
+                      const allSelected = Array.from(selectedRequestCodes).every((code) => currentPageCodes.has(code)) && 
+                                          currentPageCodes.size > 0 &&
+                                          selectedRequestCodes.size >= currentPageCodes.size;
+                      return allSelected ? (
+                        <>
+                          <CheckSquare className="w-4 h-4" />
+                          <span>ยกเลิกทั้งหมด</span>
+                        </>
+                      ) : (
+                        <>
+                          <Square className="w-4 h-4" />
+                          <span>เลือกทั้งหมด</span>
+                        </>
+                      );
+                    })()}
+                  </button>
+                  <button
+                    onClick={handleConfirmSelection}
+                    disabled={selectedRequestCodes.size === 0}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      selectedRequestCodes.size === 0
+                        ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                        : 'text-white bg-green-600 hover:bg-green-700'
+                    }`}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                    <span>ตกลง ({selectedRequestCodes.size})</span>
+                </button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg text-sm mb-4">
               {error}
@@ -612,9 +764,29 @@ export default function Repair() {
                   <div
                     key={request.code || index}
                     onClick={() => handleCardClick(request.code)}
-                    className="bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg p-4 shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                    className={`bg-white dark:bg-gray-800 border-2 rounded-lg p-4 shadow-lg hover:shadow-xl transition-all duration-200 ${
+                      isSelectionMode 
+                        ? 'cursor-pointer border-gray-300 dark:border-gray-600' 
+                        : 'cursor-pointer border-gray-300 dark:border-gray-600'
+                    } ${
+                      isSelectionMode && selectedRequestCodes.has(request.code)
+                        ? 'border-green-500 dark:border-green-500 bg-green-50 dark:bg-green-900/20'
+                        : ''
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-4">
+                      {isSelectionMode && (
+                        <div 
+                          onClick={(e) => handleToggleSelection(request.code, e)}
+                          className="flex-shrink-0 pt-1 cursor-pointer"
+                        >
+                          {selectedRequestCodes.has(request.code) ? (
+                            <CheckSquare className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <Square className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                          )}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-3">
                           <div className={`px-3 py-1 rounded-full text-xs font-semibold ${

@@ -81,6 +81,7 @@ export default function Tire() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
+      input.capture = 'environment'; // เปิดกล้องโดยตรง (กล้องหลัง) แต่ยังสามารถเลือกจาก gallery ได้
       input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
@@ -413,19 +414,19 @@ export default function Tire() {
                             </div>
                             <div className="flex-shrink-0 flex items-end gap-2">
                               <div>
-                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1 text-right">
-                                  มิลยางปัจจุบัน (มม.)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={lastMmValue}
-                                  onChange={(e) => handleLastMmChange(tireKey, e.target.value)}
-                                  placeholder="กรอกมิลยาง"
-                                  disabled={isSubmittingAll || !tire.serial_no}
-                                  className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-right"
-                                  min="0"
-                                  step="1"
-                                />
+                              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1 text-right">
+                                มิลยางปัจจุบัน (มม.)
+                              </label>
+                              <input
+                                type="number"
+                                value={lastMmValue}
+                                onChange={(e) => handleLastMmChange(tireKey, e.target.value)}
+                                placeholder="กรอกมิลยาง"
+                                disabled={isSubmittingAll || !tire.serial_no}
+                                className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-right"
+                                min="0"
+                                step="1"
+                              />
                               </div>
                               {tire.serial_no && (
                                 <button
