@@ -5,7 +5,7 @@ import { menaFixerService, MaintenanceRequest, getMechanicName } from '../servic
 import { CustomerPlantAutocomplete } from '../components/CustomerPlantAutocomplete';
 import { TruckAutocompleteInput } from '../components/TruckAutocompleteInput';
 import { inspectionService, TruckResponse } from '../services/inspection.service';
-import { Wrench, Loader2, Calendar, User, Building2, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Truck, Filter, ChevronDown, ChevronUp, X, ArrowUpDown, CheckSquare, Square } from 'lucide-react';
+import { Wrench, Loader2, Calendar,Building2, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Truck, Filter, ChevronDown, ChevronUp, X, ArrowUpDown, CheckSquare, Square } from 'lucide-react';
 
 export default function Repair() {
   const navigate = useNavigate();
@@ -375,17 +375,6 @@ export default function Repair() {
             </div>
           </div>
 
-          {user && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-4">
-              <div className="flex items-center gap-2 text-sm">
-                <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-gray-600 dark:text-gray-400">ช่าง:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {getMechanicName(user.username)}
-                </span>
-              </div>
-            </div>
-          )}
 
           <div className="mb-4">
             <CustomerPlantAutocomplete

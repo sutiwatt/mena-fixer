@@ -44,7 +44,7 @@ export default function Register() {
     try {
       await register(username.trim(), password, role);
       alert('สมัครสมาชิกสำเร็จ');
-      navigate('/inspection');
+      navigate('/repair');
     } catch (error: any) {
       setError(error.message || 'เกิดข้อผิดพลาดในการสมัครสมาชิก');
     } finally {

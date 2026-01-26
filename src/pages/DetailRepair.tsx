@@ -197,6 +197,8 @@ export default function DetailRepair() {
 
       // Step 3: Send data to API (use PATCH if record exists, POST if new)
       const mechanicName = getMechanicName(user.username);
+      // Convert to string for repair records (join array with comma if needed)
+      const mechanicNameString = Array.isArray(mechanicName) ? mechanicName.join(', ') : mechanicName;
       
       // Combine existing imageUrls with newly uploaded ones
       const finalImageUrls: (string | null)[] = [
@@ -216,7 +218,7 @@ export default function DetailRepair() {
           image_url_2: finalImageUrls[1] || null,
           image_url_3: finalImageUrls[2] || null,
           status: 'saved',
-          mechanic_name: mechanicName,
+          mechanic_name: mechanicNameString,
         });
         response = updateResponse;
         newRecordId = updateResponse.record?.id || record.recordId;
@@ -232,7 +234,7 @@ export default function DetailRepair() {
               image_url_2: finalImageUrls[1] || null,
               image_url_3: finalImageUrls[2] || null,
             status: 'saved',
-            mechanic_name: mechanicName,
+            mechanic_name: mechanicNameString,
           },
         ],
       });
@@ -349,6 +351,8 @@ export default function DetailRepair() {
       }
 
       const mechanicName = getMechanicName(user.username);
+      // Convert to string for repair records (join array with comma if needed)
+      const mechanicNameString = Array.isArray(mechanicName) ? mechanicName.join(', ') : mechanicName;
       
       // Update each saved task to completed status using PATCH
       const updatePromises = tasksToComplete.map(async (taskId) => {
@@ -363,7 +367,7 @@ export default function DetailRepair() {
           image_url_2: record.imageUrls[1] || null,
           image_url_3: record.imageUrls[2] || null,
           status: 'completed',
-          mechanic_name: mechanicName,
+          mechanic_name: mechanicNameString,
       });
       });
 

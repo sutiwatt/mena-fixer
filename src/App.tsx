@@ -78,7 +78,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to="/inspection" replace />} />
+          <Route path="/" element={<Navigate to="/repair" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

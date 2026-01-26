@@ -127,14 +127,13 @@ export default function RepairSummary() {
     const tableHTML = `
       <div style="padding: 20px; font-family: 'THSarabunNew', 'Sarabun', sans-serif; background: white; color: black;">
         <h2 style="text-align: center; margin-bottom: 20px; font-size: 18px;">สรุปอาการซ่อม</h2>
-        <p style="margin-bottom: 10px; font-size: 12px;">วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH', {
+        <p style="margin-bottom: 20px; font-size: 12px;">วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH', {
           year: 'numeric',
           month: 'long',
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit'
         })}</p>
-        ${user ? `<p style="margin-bottom: 20px; font-size: 12px;">ช่าง: ${getMechanicName(user.username)}</p>` : ''}
         <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
           <thead>
             <tr style="background-color: #ff8c00; color: white;">
@@ -265,16 +264,6 @@ export default function RepairSummary() {
             )}
           </div>
 
-          {user && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-4">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-600 dark:text-gray-400">ช่าง:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {getMechanicName(user.username)}
-                </span>
-              </div>
-            </div>
-          )}
 
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg text-sm mb-4">

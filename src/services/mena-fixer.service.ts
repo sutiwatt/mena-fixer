@@ -32,7 +32,7 @@ export interface MaintenanceRequest {
 }
 
 export interface MaintenanceRequestQueryRequest {
-  mechanic_name?: string | null;
+  mechanic_name?: string | string[] | null;
   truckplate?: string | null;
   flow?: string | null;
   customer?: string | null;
@@ -197,14 +197,40 @@ const apiCall = async <T>(
 };
 
 // Mechanic name mapping for dev/test
-const MECHANIC_NAME_MAP: Record<string, string> = {
-  'sutiwatt': 'สันติ สุขดี',
-  'mena': 'สันติ สุขดี',
+const MECHANIC_NAME_MAP: Record<string, string | string[]> = {
+  'sutiwatt': ['สันติ สุขดี'],
+  'mena': ['สันติ สุขดี'],
+  'team1': ['สันติ สุขดี','ปฏิภาณ ฉัตรพรมราช'],
+  'team2': ['สมมาตร เหล่ากลาง', 'ไพฑูรย์ ศารานารถ'],
+  'team3': ['วุฒิชัย บันเทิงจิตร', 'นันทวัฒน์ โต๊ะมีเลาะ'],
+  'pm01':['บัญชา แก่นพุทรา','ระดมพล โพธิราบ'],
+  'tire01':['โสภณ พูลผล'],
+  'tire02':['พลากร คำศรี'],
+  'all01':['พิสิทฐ์ นิมประพัตร','ศักดิ์สิทธิ์ เอกสุข','กมล ออมสิน','จิรานุวัฒน์ ประคองใจ','สุภีร์ ประคองใจ','ชินกร อมรพลัง',
+    'สุรศักดิ์ นามพูน','วิศรุต ทองวิลัย','กฤษดา แน่นดี','กฤษณะ พันธ์น้อยนนท์','ปัญญา สถิตย์ยุติธรรม','จักรพล รอดภักดี','ประณต ศรีสำราญ','ณัฐพงษ์ ศรีสำราญ','กิตติ ดวงประดิษฐ์','อลงกรณ์ ผาจวง'
+  ]
   // Add more mappings here as needed
 };
 
-const getMechanicName = (username: string): string => {
-  return MECHANIC_NAME_MAP[username.toLowerCase()] || username;
+const getMechanicName = (username: string): string | string[] => {
+  const name = MECHANIC_NAME_MAP[username.toLowerCase()];
+  if (!name) {
+    return username;
+  }
+  // ถ้าเป็น array ให้คืนค่าเป็น array (สำหรับส่งไปที่ API)
+  if (Array.isArray(name)) {
+    return name;
+  }
+  return name;
+};
+
+// Function สำหรับแสดงชื่อช่างใน UI (join ด้วย comma)
+const getMechanicNameForDisplay = (username: string): string => {
+  const name = getMechanicName(username);
+  if (Array.isArray(name)) {
+    return name.join(', ');
+  }
+  return name;
 };
 
 // Mena Fixer Service
@@ -306,6 +332,6 @@ export const menaFixerService = {
   },
 };
 
-export { getMechanicName };
+export { getMechanicName, getMechanicNameForDisplay };
 
 

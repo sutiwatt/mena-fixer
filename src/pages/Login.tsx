@@ -25,7 +25,7 @@ export default function Login() {
     
     try {
       await login(username.trim(), password);
-      navigate('/inspection');
+      navigate('/repair');
     } catch (error: any) {
       setError(error.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
     } finally {
