@@ -4,7 +4,7 @@ import { TruckAutocompleteInput } from '../components/TruckAutocompleteInput';
 import { inspectionService, TruckResponse } from '../services/inspection.service';
 import { tireService, TireWithInfoResponse, TireDataResponse } from '../services/tire.service';
 import { imageUploadService } from '../services/image-upload.service';
-import { Truck, Loader2, CircleDot, Save, CheckCircle, XCircle, Camera, X } from 'lucide-react';
+import { Truck, Loader2, CircleDot, Save, CheckCircle, XCircle, Camera, X, ImagePlus } from 'lucide-react';
 
 interface TireFailedData {
   notes: string;
@@ -76,12 +76,12 @@ export default function Tire() {
     }));
   };
 
-  const handleImagePicker = async (tireKey: string) => {
+  const handleImagePicker = async (tireKey: string, useCamera: boolean) => {
     try {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
-      input.capture = 'environment'; // เปิดกล้องโดยตรง (กล้องหลัง) แต่ยังสามารถเลือกจาก gallery ได้
+      if (useCamera) input.setAttribute('capture', 'environment');
       input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
@@ -458,13 +458,22 @@ export default function Tire() {
                               />
                               <div>
                                 {!failedTires[tireKey].imageUrl ? (
-                                  <button
-                                    onClick={() => handleImagePicker(tireKey)}
-                                    className="flex items-center gap-2 px-4 py-2 border border-red-500 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
-                                  >
-                                    <Camera className="w-4 h-4" />
-                                    <span>เพิ่มรูปภาพ</span>
-                                  </button>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      onClick={() => handleImagePicker(tireKey, true)}
+                                      className="p-2 border border-red-500 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+                                      title="ถ่ายรูป"
+                                    >
+                                      <Camera className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleImagePicker(tireKey, false)}
+                                      className="p-2 border border-gray-500 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                                      title="เลือกจากคลัง"
+                                    >
+                                      <ImagePlus className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 ) : (
                                   <div className="relative inline-block">
                                     <img

@@ -32,6 +32,10 @@ export interface MaintenanceRequest {
 }
 
 export interface MaintenanceRequestQueryRequest {
+  /** ค้นหาเลข MR (code) เท่านั้น (LIKE) เช่น "10651" */
+  search_code?: string | null;
+  /** ค้นหาเลขรถ (vehicle_code, vehicle_name) เท่านั้น (LIKE) เช่น "1041" */
+  search_vehicle?: string | null;
   mechanic_name?: string | string[] | null;
   truckplate?: string | null;
   flow?: string | null;
@@ -40,6 +44,7 @@ export interface MaintenanceRequestQueryRequest {
   is_broken?: boolean | null;
   datestart?: string | null; // YYYY-MM-DD
   dateend?: string | null; // YYYY-MM-DD
+  get_all?: boolean; // Query ทั้งหมด (ไม่ต้องส่ง filter) - ใช้สำหรับ master view
   limit?: number;
   offset?: number;
 }
@@ -179,7 +184,8 @@ const apiCall = async <T>(
   options: RequestInit = {}
 ): Promise<T> => {
   const url = `${BASE_URL}${endpoint}`;
-  
+  const method = options.method || 'GET';
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -193,12 +199,24 @@ const apiCall = async <T>(
     throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  // Debug: log API response
+  if (import.meta.env.DEV) {
+    console.log('[API Response]', method, endpoint, data);
+  }
+  return data as T;
 };
 
-// Mechanic name mapping for dev/test
+// Master users - users ที่สามารถดูข้อมูลทั้งหมดได้ (ส่ง get_all=true)
+const MASTER_USERS: string[] = [
+  'mastermena',
+  'sutiwatt'
+];
+
+// Mechanic name mapping: username -> ชื่อช่าง (หรือ array ชื่อช่าง)
+// - GET/query: ใช้ getMechanicName(username) ส่ง array ชื่อไป filter หลังบ้าน
+// - POST/PATCH บันทึก repair records: ส่ง username เท่านั้น (เช่น team2) ไปเก็บใน database
 const MECHANIC_NAME_MAP: Record<string, string | string[]> = {
-  'sutiwatt': ['สันติ สุขดี'],
   'mena': ['สันติ สุขดี'],
   'team1': ['สันติ สุขดี','ปฏิภาณ ฉัตรพรมราช'],
   'team2': ['สมมาตร เหล่ากลาง', 'ไพฑูรย์ ศารานารถ'],
@@ -210,6 +228,11 @@ const MECHANIC_NAME_MAP: Record<string, string | string[]> = {
     'สุรศักดิ์ นามพูน','วิศรุต ทองวิลัย','กฤษดา แน่นดี','กฤษณะ พันธ์น้อยนนท์','ปัญญา สถิตย์ยุติธรรม','จักรพล รอดภักดี','ประณต ศรีสำราญ','ณัฐพงษ์ ศรีสำราญ','กิตติ ดวงประดิษฐ์','อลงกรณ์ ผาจวง'
   ]
   // Add more mappings here as needed
+};
+
+// Check if user is a master user (can view all data)
+const isMasterUser = (username: string): boolean => {
+  return MASTER_USERS.includes(username.toLowerCase());
 };
 
 const getMechanicName = (username: string): string | string[] => {
@@ -332,6 +355,6 @@ export const menaFixerService = {
   },
 };
 
-export { getMechanicName, getMechanicNameForDisplay };
+export { getMechanicName, getMechanicNameForDisplay, isMasterUser };
 
 

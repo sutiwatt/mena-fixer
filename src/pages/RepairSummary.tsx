@@ -281,7 +281,11 @@ export default function RepairSummary() {
               {maintenanceRequests.map((request, index) => (
                 <div
                   key={request.code || index}
-                  className="bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg p-4 shadow-lg"
+                  className={`rounded-lg p-4 shadow-lg border-2 ${
+                    index % 2 === 0
+                      ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800'
+                      : 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800'
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -314,7 +318,11 @@ export default function RepairSummary() {
                             {maintenanceTasks[request.code].map((task, taskIndex) => (
                               <div
                                 key={task.id}
-                                className="flex items-start gap-2 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                                className={`flex items-start gap-2 p-2 rounded-lg ${
+                                  taskIndex % 2 === 0
+                                    ? 'bg-white/60 dark:bg-gray-800/60'
+                                    : 'bg-gray-100/80 dark:bg-gray-700/60'
+                                }`}
                               >
                                 <span className="text-xs font-medium text-gray-500 dark:text-gray-400 min-w-[24px]">
                                   {taskIndex + 1}.

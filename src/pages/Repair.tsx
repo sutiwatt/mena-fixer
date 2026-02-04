@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { menaFixerService, MaintenanceRequest, getMechanicName } from '../services/mena-fixer.service';
+import { menaFixerService, MaintenanceRequest, getMechanicName, isMasterUser } from '../services/mena-fixer.service';
 import { CustomerPlantAutocomplete } from '../components/CustomerPlantAutocomplete';
 import { TruckAutocompleteInput } from '../components/TruckAutocompleteInput';
 import { inspectionService, TruckResponse } from '../services/inspection.service';
-import { Wrench, Loader2, Calendar,Building2, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Truck, Filter, ChevronDown, ChevronUp, X, ArrowUpDown, CheckSquare, Square } from 'lucide-react';
+import { Wrench, Loader2, Calendar, Building2, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Truck, Filter, ChevronDown, ChevronUp, X, ArrowUpDown, CheckSquare, Square, Search } from 'lucide-react';
 
 export default function Repair() {
   const navigate = useNavigate();
@@ -26,19 +26,22 @@ export default function Repair() {
   const [selectedTruckplate, setSelectedTruckplate] = useState<string>('');
   const [selectedDateStart, setSelectedDateStart] = useState<string>('');
   const [selectedDateEnd, setSelectedDateEnd] = useState<string>('');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // asc = เก่า→ใหม่, desc = ใหม่→เก่า
+  const [searchCode, setSearchCode] = useState<string>(''); // ค่าที่พิมพ์ (เลข MR)
+  const [searchVehicle, setSearchVehicle] = useState<string>(''); // ค่าที่พิมพ์ (เลขรถ)
+  const [searchCodeApplied, setSearchCodeApplied] = useState<string>(''); // ค่าที่ส่ง API (กดค้นหาแล้ว)
+  const [searchVehicleApplied, setSearchVehicleApplied] = useState<string>(''); // ค่าที่ส่ง API (กดค้นหาแล้ว)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc'); // desc = ใหม่→เก่า (ใหม่ที่สุดอยู่บนเสมอ)
   const [activeTab, setActiveTab] = useState<'pending' | 'in_progress' | 'completed'>('pending');
-  const [taskCounts, setTaskCounts] = useState<Record<string, number>>({}); // {code: totalTasks}
   const [isSelectionMode, setIsSelectionMode] = useState(false); // โหมดเลือก card
   const [selectedRequestCodes, setSelectedRequestCodes] = useState<Set<string>>(new Set()); // เก็บ code ของ card ที่เลือก
-  const limit = 20;
+  const limit = 200;
 
-  // ดึง API เฉพาะเมื่อ filter อื่นๆ เปลี่ยน (ไม่ใช่เมื่อเปลี่ยน tab)
+  // ดึง API เฉพาะเมื่อ filter อื่นๆ เปลี่ยน (ไม่ใช่เมื่อพิมพ์ search ทุกตัวอักษร)
   useEffect(() => {
     if (user?.username) {
       loadMaintenanceRequests();
     }
-  }, [user, selectedCustomer, selectedPlant, selectedIsBroken, selectedTruckplate, selectedDateStart, selectedDateEnd, sortOrder]);
+  }, [user, selectedCustomer, selectedPlant, selectedIsBroken, selectedTruckplate, selectedDateStart, selectedDateEnd, searchCodeApplied, searchVehicleApplied, sortOrder]);
 
   // Filter และ paginate จากข้อมูลที่มีอยู่แล้วเมื่อเปลี่ยน tab หรือหน้า
   useEffect(() => {
@@ -54,16 +57,21 @@ export default function Repair() {
     setError('');
 
     try {
-      // Get mechanic name from mapping
-      const mechanicName = getMechanicName(user.username);
-
       // Build request object
       const requestParams: any = {
-        mechanic_name: mechanicName,
         flow: 'แจ้งซ่อม',
         limit,
         offset: currentPage * limit,
       };
+
+      // Check if user is master - if yes, send get_all=true and skip mechanic_name filter
+      if (isMasterUser(user.username)) {
+        requestParams.get_all = true;
+      } else {
+        // Get mechanic name from mapping for non-master users
+        const mechanicName = getMechanicName(user.username);
+        requestParams.mechanic_name = mechanicName;
+      }
 
       // Add advanced filters
       if (selectedIsBroken !== null) {
@@ -85,8 +93,17 @@ export default function Repair() {
       requestParams.customer = selectedCustomer || null;
       requestParams.plant = selectedPlant || null;
 
+      // ค้นหาเลข MR (code) - ใช้ค่าที่กดค้นหาแล้ว
+      if (searchCodeApplied.trim()) {
+        requestParams.search_code = searchCodeApplied.trim();
+      }
+      // ค้นหาเลขรถ (vehicle_code, vehicle_name) - ใช้ค่าที่กดค้นหาแล้ว
+      if (searchVehicleApplied.trim()) {
+        requestParams.search_vehicle = searchVehicleApplied.trim();
+      }
+
       // If no filters are selected, use default date range (7 days ago to today)
-      const hasAnyFilter = selectedCustomer || selectedPlant || selectedIsBroken !== null || selectedTruckplate.trim() || selectedDateStart || selectedDateEnd;
+      const hasAnyFilter = selectedCustomer || selectedPlant || selectedIsBroken !== null || selectedTruckplate.trim() || selectedDateStart || selectedDateEnd || searchCodeApplied.trim() || searchVehicleApplied.trim();
       if (!hasAnyFilter) {
         // Default: Calculate date range (7 days ago to today)
         const today = new Date();
@@ -169,33 +186,7 @@ export default function Repair() {
     setHasNext(endIndex < filteredData.length);
     setHasPrev(currentPage > 0);
     setTotalPages(filteredTotalPages);
-    
-    // Load task counts for each request (only for paginated data to reduce API calls)
-    const loadTaskCounts = async () => {
-      const counts: Record<string, number> = {};
-      const promises = paginatedData.map(async (req) => {
-        // Skip if already loaded
-        if (taskCounts[req.code] !== undefined) {
-          counts[req.code] = taskCounts[req.code];
-          return;
-        }
-        try {
-          const tasks = await menaFixerService.getMaintenanceTasksByRequest(req.code);
-          let totalTasks = 0;
-          Object.values(tasks.tasks_by_type).forEach((taskList) => {
-            totalTasks += taskList.length;
-          });
-          counts[req.code] = totalTasks;
-        } catch (error) {
-          console.error(`Error loading task count for ${req.code}:`, error);
-          counts[req.code] = 0;
-        }
-      });
-      await Promise.all(promises);
-      setTaskCounts((prev) => ({ ...prev, ...counts }));
-    };
-    
-    loadTaskCounts();
+    // ไม่ดึง maintenance-tasks ที่ Repair - จะดึงเมื่อไป DetailRepair หรือ RepairSummary แทน
   };
 
   const formatDateTime = (dateString: string | null | undefined): string => {
@@ -359,6 +350,13 @@ export default function Repair() {
     }
   };
 
+  // กดปุ่มค้นหาแล้วค่อยส่ง API
+  const handleSearch = () => {
+    setSearchCodeApplied(searchCode.trim());
+    setSearchVehicleApplied(searchVehicle.trim());
+    setCurrentPage(0);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
@@ -375,6 +373,70 @@ export default function Repair() {
             </div>
           </div>
 
+
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-0 flex-1 basis-0">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                ค้นหาเลข JOB
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={searchCode}
+                  onChange={(e) => setSearchCode(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  placeholder="เช่น 10651"
+                  className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                {searchCode && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchCode(''); setSearchCodeApplied(''); setCurrentPage(0); }}
+                    className="flex-shrink-0 px-3 py-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    title="ล้าง"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="min-w-0 flex-1 basis-0">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                ค้นหาเลขรถ
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={searchVehicle}
+                  onChange={(e) => setSearchVehicle(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  placeholder="เช่น 1041 หรือ TH1041"
+                  className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                {searchVehicle && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchVehicle(''); setSearchVehicleApplied(''); setCurrentPage(0); }}
+                    className="flex-shrink-0 px-3 py-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    title="ล้าง"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="mb-4 flex justify-end">
+            <button
+              type="button"
+              onClick={handleSearch}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors"
+              title="ค้นหา"
+            >
+              <Search className="w-4 h-4" />
+              <span>ค้นหา</span>
+            </button>
+          </div>
 
           <div className="mb-4">
             <CustomerPlantAutocomplete
@@ -807,11 +869,11 @@ export default function Repair() {
                               </span>
                             </div>
                           )}
-                          {/* Task Count */}
-                          {request.repair_records && taskCounts[request.code] !== undefined && (
+                          {/* แสดงจำนวนที่ saved (ไม่ดึง task count เพื่อลด API calls) */}
+                          {request.repair_records && request.repair_records.status_counts.saved > 0 && (
                             <div className="px-3 py-1 bg-blue-100 dark:bg-blue-900/20 rounded-full">
                               <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                                {request.repair_records.status_counts.saved}/{taskCounts[request.code]}
+                                บันทึกแล้ว {request.repair_records.status_counts.saved} รายการ
                               </span>
                             </div>
                           )}

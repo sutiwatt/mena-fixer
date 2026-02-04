@@ -16,6 +16,7 @@ import {
   Truck,
   X,
   XCircle,
+  ImagePlus,
 } from 'lucide-react';
 
 // Types
@@ -160,12 +161,12 @@ export default function Inspection() {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, notes } : item)));
   };
 
-  const handleImagePicker = async (id: string) => {
+  const handleImagePicker = async (id: string, useCamera: boolean) => {
     try {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
-      input.capture = 'environment'; // เปิดกล้องโดยตรง (กล้องหลัง) แต่ยังสามารถเลือกจาก gallery ได้
+      if (useCamera) input.setAttribute('capture', 'environment');
       input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
@@ -577,13 +578,22 @@ export default function Inspection() {
                       />
                       <div>
                         {!item.imageUrl ? (
-                          <button
-                            onClick={() => handleImagePicker(item.id)}
-                            className="flex items-center gap-2 px-4 py-2 border border-yellow-500 text-yellow-600 dark:text-yellow-400 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
-                          >
-                            <Camera className="w-4 h-4" />
-                            <span>เพิ่มรูปภาพ</span>
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() => handleImagePicker(item.id, true)}
+                              className="p-2 border border-yellow-500 text-yellow-600 dark:text-yellow-400 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+                              title="ถ่ายรูป"
+                            >
+                              <Camera className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleImagePicker(item.id, false)}
+                              className="p-2 border border-gray-500 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                              title="เลือกจากคลัง"
+                            >
+                              <ImagePlus className="w-4 h-4" />
+                            </button>
+                          </div>
                         ) : (
                           <div className="relative inline-block">
                             <img src={item.imageUrl} alt="Preview" className="w-32 h-32 object-cover rounded-lg" />

@@ -4,7 +4,7 @@ import { TruckAutocompleteInput } from '../components/TruckAutocompleteInput';
 import { inspectionService, TruckResponse } from '../services/inspection.service';
 import { imageUploadService } from '../services/image-upload.service';
 import { truckPhotoService, TruckImageSubmissionResponse } from '../services/truck-photo.service';
-import { Camera, Truck, Loader2, X, ArrowLeft, Upload, CheckCircle, Clock } from 'lucide-react';
+import { Camera, Truck, Loader2, X, ArrowLeft, Upload, CheckCircle, Clock, ImagePlus } from 'lucide-react';
 
 type PhotoSide = 'left' | 'right' | 'front' | 'back' | 'interior';
 
@@ -125,12 +125,11 @@ export default function Photo() {
     }
   };
 
-  const handleImagePicker = (side: PhotoSide) => {
+  const handleImagePicker = (side: PhotoSide, useCamera: boolean) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.capture = 'environment'; // เปิดกล้องโดยตรง (กล้องหลัง) แต่ยังสามารถเลือกจาก gallery ได้
-    
+    if (useCamera) input.setAttribute('capture', 'environment');
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
@@ -149,7 +148,6 @@ export default function Photo() {
         reader.readAsDataURL(file);
       }
     };
-    
     input.click();
   };
 
@@ -467,27 +465,50 @@ export default function Photo() {
                           </button>
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleImagePicker(side)}
-                          className="w-full aspect-square border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex flex-col items-center justify-center gap-2 hover:border-blue-500 dark:hover:border-blue-500 transition-colors bg-white dark:bg-gray-700"
-                        >
-                          <Camera className="w-8 h-8 text-gray-400 dark:text-gray-500" />
-                          <span className="text-xs text-gray-500 dark:text-gray-400 text-center px-2">
-                            กดเพื่อถ่ายรูป
+                        <div className="w-full aspect-square border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex flex-col items-center justify-center gap-3 p-3 bg-white dark:bg-gray-700">
+                          <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                            เพิ่มรูป
                           </span>
-                        </button>
+                          <div className="flex gap-2 flex-wrap justify-center">
+                            <button
+                              type="button"
+                              onClick={() => handleImagePicker(side, true)}
+                              className="p-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white"
+                              title="ถ่ายรูป"
+                            >
+                              <Camera className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleImagePicker(side, false)}
+                              className="p-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white dark:bg-gray-500 dark:hover:bg-gray-600"
+                              title="เลือกจากคลัง"
+                            >
+                              <ImagePlus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
                       )}
 
                       {hasPhoto && !photo.uploadedUrl && (
-                        <button
-                          type="button"
-                          onClick={() => handleImagePicker(side)}
-                          className="w-full mt-2 px-3 py-2 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center gap-1"
-                        >
-                          <Camera className="w-3 h-3" />
-                          <span>เปลี่ยนรูป</span>
-                        </button>
+                        <div className="w-full mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleImagePicker(side, true)}
+                            className="flex-1 p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center"
+                            title="ถ่ายรูป"
+                          >
+                            <Camera className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleImagePicker(side, false)}
+                            className="flex-1 p-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center justify-center"
+                            title="เลือกจากคลัง"
+                          >
+                            <ImagePlus className="w-4 h-4" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   );

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { menaFixerService, MaintenanceTasksResponse, getMechanicName, RepairRecordsByRequestResponse, MaintenanceRepairRecordsResponse, MaintenanceRepairRecordUpdateResponse } from '../services/mena-fixer.service';
+import { menaFixerService, MaintenanceTasksResponse, RepairRecordsByRequestResponse, MaintenanceRepairRecordsResponse, MaintenanceRepairRecordUpdateResponse } from '../services/mena-fixer.service';
 import { imageUploadService } from '../services/image-upload.service';
-import { Wrench, Loader2, ArrowLeft, ListChecks, Truck, Camera, X, Save, CheckCircle, CheckCircle2, AlertCircle, Clock, User } from 'lucide-react';
+import { Wrench, Loader2, ArrowLeft, ListChecks, Truck, Camera, X, Save, CheckCircle, CheckCircle2, AlertCircle, Clock, ImagePlus } from 'lucide-react';
 
 interface RepairRecord {
   taskId: number;
@@ -196,10 +196,9 @@ export default function DetailRepair() {
       }));
 
       // Step 3: Send data to API (use PATCH if record exists, POST if new)
-      const mechanicName = getMechanicName(user.username);
-      // Convert to string for repair records (join array with comma if needed)
-      const mechanicNameString = Array.isArray(mechanicName) ? mechanicName.join(', ') : mechanicName;
-      
+      // บันทึก (POST/PATCH): ส่ง username เท่านั้น เช่น team2 (หลังบ้านเก็บเป็น key)
+      const mechanicNameForSave = user.username;
+
       // Combine existing imageUrls with newly uploaded ones
       const finalImageUrls: (string | null)[] = [
         uploadedUrls[0] || record.imageUrls[0] || null,
@@ -218,7 +217,7 @@ export default function DetailRepair() {
           image_url_2: finalImageUrls[1] || null,
           image_url_3: finalImageUrls[2] || null,
           status: 'saved',
-          mechanic_name: mechanicNameString,
+          mechanic_name: mechanicNameForSave,
         });
         response = updateResponse;
         newRecordId = updateResponse.record?.id || record.recordId;
@@ -234,7 +233,7 @@ export default function DetailRepair() {
               image_url_2: finalImageUrls[1] || null,
               image_url_3: finalImageUrls[2] || null,
             status: 'saved',
-            mechanic_name: mechanicNameString,
+            mechanic_name: mechanicNameForSave,
           },
         ],
       });
@@ -350,10 +349,9 @@ export default function DetailRepair() {
         throw new Error('ไม่มีรายการที่ต้องอัปเดตสถานะ');
       }
 
-      const mechanicName = getMechanicName(user.username);
-      // Convert to string for repair records (join array with comma if needed)
-      const mechanicNameString = Array.isArray(mechanicName) ? mechanicName.join(', ') : mechanicName;
-      
+      // บันทึก (PATCH): ส่ง username เท่านั้น เช่น team2
+      const mechanicNameForSave = user.username;
+
       // Update each saved task to completed status using PATCH
       const updatePromises = tasksToComplete.map(async (taskId) => {
         const record = repairRecords[taskId];
@@ -367,7 +365,7 @@ export default function DetailRepair() {
           image_url_2: record.imageUrls[1] || null,
           image_url_3: record.imageUrls[2] || null,
           status: 'completed',
-          mechanic_name: mechanicNameString,
+          mechanic_name: mechanicNameForSave,
       });
       });
 
@@ -545,12 +543,7 @@ export default function DetailRepair() {
                                               <span>บันทึกเมื่อ: {recordDate}</span>
                                             </div>
                                           )}
-                                          {latestRecord.mechanic_name && (
-                                            <div className="flex items-center gap-1">
-                                              <User className="w-3 h-3" />
-                                              <span>ช่าง: {latestRecord.mechanic_name}</span>
-                                            </div>
-                                          )}
+                                         
                                           {latestRecord.status && (
                                             <div className="flex items-center gap-1">
                                               <span className={`px-2 py-1 rounded text-xs ${
@@ -618,24 +611,48 @@ export default function DetailRepair() {
                                             </button>
                                           </div>
                                         ) : (
-                                          <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-orange-500 dark:hover:border-orange-500 transition-colors bg-gray-50 dark:bg-gray-700/50">
-                                            <Camera className="w-8 h-8 text-gray-400 dark:text-gray-500 mb-2" />
-                                            <span className="text-xs text-gray-500 dark:text-gray-400 text-center px-2">
+                                          <div className="flex flex-col items-center justify-center gap-2 aspect-square border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 p-2">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
                                               เพิ่มรูป
                                             </span>
-                                            <input
-                                              type="file"
-                                              accept="image/*"
-                                              capture="environment"
-                                              className="hidden"
-                                              onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) {
-                                                  handleImageChange(task.id, index, file);
-                                                }
-                                              }}
-                                            />
-                                          </label>
+                                            <div className="flex gap-2 w-full justify-center flex-wrap">
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const input = document.createElement('input');
+                                                  input.type = 'file';
+                                                  input.accept = 'image/*';
+                                                  input.setAttribute('capture', 'environment');
+                                                  input.onchange = (e) => {
+                                                    const file = (e.target as HTMLInputElement).files?.[0];
+                                                    if (file) handleImageChange(task.id, index, file);
+                                                  };
+                                                  input.click();
+                                                }}
+                                                className="p-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white"
+                                                title="ถ่ายรูป"
+                                              >
+                                                <Camera className="w-4 h-4" />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const input = document.createElement('input');
+                                                  input.type = 'file';
+                                                  input.accept = 'image/*';
+                                                  input.onchange = (e) => {
+                                                    const file = (e.target as HTMLInputElement).files?.[0];
+                                                    if (file) handleImageChange(task.id, index, file);
+                                                  };
+                                                  input.click();
+                                                }}
+                                                className="p-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white dark:bg-gray-500 dark:hover:bg-gray-600"
+                                                title="เลือกจากคลัง"
+                                              >
+                                                <ImagePlus className="w-4 h-4" />
+                                              </button>
+                                            </div>
+                                          </div>
                                         )}
                                       </div>
                                     );
@@ -647,12 +664,8 @@ export default function DetailRepair() {
                               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
                                 <button
                                   onClick={() => handleSaveTask(task.id)}
-                                  disabled={savingTaskId === task.id || savedTasks.has(task.id)}
-                                  className={`w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                    savedTasks.has(task.id)
-                                      ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 cursor-not-allowed'
-                                      : 'bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed'
-                                  }`}
+                                  disabled={savingTaskId === task.id}
+                                  className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {savingTaskId === task.id ? (
                                     <>
@@ -661,8 +674,8 @@ export default function DetailRepair() {
                                     </>
                                   ) : savedTasks.has(task.id) ? (
                                     <>
-                                      <CheckCircle className="w-4 h-4" />
-                                      <span>บันทึกแล้ว</span>
+                                      <Save className="w-4 h-4" />
+                                      <span>อัปเดตการซ่อม</span>
                                     </>
                                   ) : (
                                     <>
