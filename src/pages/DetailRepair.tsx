@@ -110,6 +110,7 @@ export default function DetailRepair() {
   };
 
   const handleRepairDescriptionChange = (taskId: number, value: string) => {
+    setError('');
     setRepairRecords((prev) => ({
       ...prev,
       [taskId]: {
@@ -120,6 +121,7 @@ export default function DetailRepair() {
   };
 
   const handleImageChange = (taskId: number, index: number, file: File | null) => {
+    setError('');
     setRepairRecords((prev) => {
       const record = prev[taskId] || {
         taskId,
@@ -158,6 +160,20 @@ export default function DetailRepair() {
 
     const record = repairRecords[taskId];
     if (!record) return;
+
+    // Validate ก่อนส่ง API: ต้องมีรูปอย่างน้อย 1 รูป + repair_description อย่างน้อย 10 ตัวอักษร
+    const hasImage = record.images.length > 0 || record.imageUrls.length > 0;
+    const descTrimmed = (record.repairDescription || '').trim();
+    const hasValidDescription = descTrimmed.length >= 10;
+
+    if (!hasImage) {
+      setError('กรุณาเพิ่มรูปถ่ายอย่างน้อย 1 รูป');
+      return;
+    }
+    if (!hasValidDescription) {
+      setError('กรุณาระบุรายละเอียดการซ่อมอย่างน้อย 10 ตัวอักษร');
+      return;
+    }
 
     setSavingTaskId(taskId);
     setError('');
@@ -572,7 +588,7 @@ export default function DetailRepair() {
                               {/* Repair Description */}
                               <div>
                                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                  บันทึกการซ่อม
+                                  บันทึกการซ่อม <span className="text-orange-600 font-normal">(อย่างน้อย 10 ตัวอักษร)</span>
                                 </label>
                                 <textarea
                                   value={record.repairDescription}
@@ -586,7 +602,7 @@ export default function DetailRepair() {
                               {/* Image Upload */}
                               <div>
                                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                  รูปถ่าย (สูงสุด 3 รูป)
+                                  รูปถ่าย <span className="text-orange-600 font-normal">(อย่างน้อย 1 รูป, สูงสุด 3 รูป)</span>
                                 </label>
                                 <div className="grid grid-cols-3 gap-3">
                                   {[0, 1, 2].map((index) => {
