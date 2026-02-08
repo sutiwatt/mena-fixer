@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { menaFixerService, MaintenanceTasksResponse, RepairRecordsByRequestResponse, MaintenanceRepairRecordsResponse, MaintenanceRepairRecordUpdateResponse } from '../services/mena-fixer.service';
 import { imageUploadService } from '../services/image-upload.service';
-import { Wrench, Loader2, ArrowLeft, ListChecks, Truck, Camera, X, Save, CheckCircle, CheckCircle2, AlertCircle, Clock, ImagePlus } from 'lucide-react';
+import { Wrench, Loader2, ArrowLeft, ListChecks, Truck, Camera, X, Save, CheckCircle, CheckCircle2, AlertCircle, Clock, ImagePlus, User, Phone } from 'lucide-react';
 
 interface RepairRecord {
   taskId: number;
@@ -288,6 +288,24 @@ export default function DetailRepair() {
     }
   };
 
+  // ดึง metadata จาก task แรก (ข้อมูลรถ/คนขับเหมือนกันทุก task)
+  const getMetadata = () => {
+    if (!maintenanceTasks) return null;
+    const firstTask = Object.values(maintenanceTasks.tasks_by_type).flat()[0];
+    if (!firstTask) return null;
+    const hasAny = firstTask.driver_name || firstTask.phone_number || firstTask.trucknum || firstTask.truckplate || (firstTask.inform_mile_no != null && firstTask.inform_mile_no !== 0);
+    if (!hasAny) return null;
+    return {
+      driver_name: firstTask.driver_name,
+      phone_number: firstTask.phone_number,
+      trucknum: firstTask.trucknum,
+      truckplate: firstTask.truckplate,
+      inform_mile_no: firstTask.inform_mile_no,
+    };
+  };
+
+  const metadata = getMetadata();
+
   // Calculate total tasks count
   const getTotalTasksCount = (): number => {
     if (!maintenanceTasks) return 0;
@@ -426,6 +444,44 @@ export default function DetailRepair() {
             </div>
           </div>
 
+          {/* Metadata - ชื่อคนขับ เบอร์โทร เลขรถ ไมล์ ทะเบียน */}
+          {metadata && !isLoading && (
+            <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-950/30 rounded-xl border-2 border-orange-200 dark:border-orange-800 shadow-sm">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-medium text-gray-800 dark:text-gray-200">
+                {metadata.driver_name && (
+                  <div className="flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
+                    <span>คนขับ: <span className="text-orange-700 dark:text-orange-300 font-semibold">{metadata.driver_name}</span></span>
+                  </div>
+                )}
+                {metadata.phone_number && (
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
+                    <span>โทร: <span className="text-orange-700 dark:text-orange-300 font-semibold">{metadata.phone_number}</span></span>
+                  </div>
+                )}
+                {metadata.trucknum && (
+                  <div className="flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
+                    <span>เลขรถ: <span className="text-orange-700 dark:text-orange-300 font-semibold">{metadata.trucknum}</span></span>
+                  </div>
+                )}
+                {metadata.inform_mile_no != null && metadata.inform_mile_no !== 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
+                    <span>ไมล์: <span className="text-orange-700 dark:text-orange-300 font-semibold">{metadata.inform_mile_no.toLocaleString()}</span></span>
+                  </div>
+                )}
+                {metadata.truckplate && (
+                  <div className="flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
+                    <span>ทะเบียน: <span className="text-orange-700 dark:text-orange-300 font-semibold">{metadata.truckplate}</span></span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Content */}
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
@@ -467,33 +523,9 @@ export default function DetailRepair() {
                           >
                             {/* Problem Display */}
                             <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-600">
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1">
-                                  <p className="text-gray-900 dark:text-white font-medium mb-2">
-                                    ปัญหา: {task.problem}
-                                  </p>
-                                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                                  {task.inform_mile_no && (
-                                      <div className="flex items-center gap-2">
-                                      <Truck className="w-4 h-4" />
-                                      <span>ไมล์: {task.inform_mile_no.toLocaleString()}</span>
-                                    </div>
-                                  )}
-                                    {task.trucknum && (
-                                      <div className="flex items-center gap-2">
-                                        <Truck className="w-4 h-4" />
-                                        <span>เลขรถ: {task.trucknum}</span>
-                                      </div>
-                                    )}
-                                    {task.truckplate && (
-                                      <div className="flex items-center gap-2">
-                                        <Truck className="w-4 h-4" />
-                                        <span>ทะเบียน: {task.truckplate}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
+                              <p className="text-gray-900 dark:text-white font-medium">
+                                ปัญหา: {task.problem}
+                              </p>
                             </div>
 
                             {/* Existing Records Display */}

@@ -79,6 +79,8 @@ export interface MaintenanceTask {
   inform_mile_no: number;
   trucknum?: string | null;
   truckplate?: string | null;
+  driver_name?: string | null;
+  phone_number?: string | null;
 }
 
 export interface MaintenanceTasksResponse {
@@ -184,7 +186,6 @@ const apiCall = async <T>(
   options: RequestInit = {}
 ): Promise<T> => {
   const url = `${BASE_URL}${endpoint}`;
-  const method = options.method || 'GET';
 
   const response = await fetch(url, {
     ...options,
@@ -200,10 +201,6 @@ const apiCall = async <T>(
   }
 
   const data = await response.json();
-  // Debug: log API response
-  if (import.meta.env.DEV) {
-    console.log('[API Response]', method, endpoint, data);
-  }
   return data as T;
 };
 
