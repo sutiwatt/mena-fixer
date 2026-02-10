@@ -38,7 +38,7 @@ export interface MaintenanceRequestQueryRequest {
   search_vehicle?: string | null;
   mechanic_name?: string | string[] | null;
   truckplate?: string | null;
-  flow?: string | null;
+  flow?: string | string[] | null;
   customer?: string | null;
   plant?: string | null;
   is_broken?: boolean | null;

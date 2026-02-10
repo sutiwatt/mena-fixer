@@ -62,7 +62,7 @@ export default function RepairSummary() {
       // Query with a large limit to get all requests, then filter by codes
       const response = await menaFixerService.queryMaintenanceRequest({
         mechanic_name: mechanicName,
-        flow: 'แจ้งซ่อม',
+        flow: ['แจ้งซ่อม', 'ขอเปลี่ยนยาง'],
         limit: 1000, // Large limit to get all requests
         offset: 0,
       });
@@ -77,7 +77,7 @@ export default function RepairSummary() {
         while (requests.length < codes.length && offset < response.pagination.total_pages * response.pagination.limit) {
           const nextResponse = await menaFixerService.queryMaintenanceRequest({
             mechanic_name: mechanicName,
-            flow: 'แจ้งซ่อม',
+            flow: ['แจ้งซ่อม', 'ขอเปลี่ยนยาง'],
             limit: 1000,
             offset: offset,
           });

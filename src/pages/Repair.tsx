@@ -59,7 +59,7 @@ export default function Repair() {
     try {
       // Build request object
       const requestParams: any = {
-        flow: 'แจ้งซ่อม',
+        flow: ['แจ้งซ่อม', 'ขอเปลี่ยนยาง'],
         limit,
         offset: currentPage * limit,
       };
