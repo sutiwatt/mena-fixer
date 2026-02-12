@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { menaFixerService, MaintenanceRequest, getMechanicName, isMasterUser } from '../services/mena-fixer.service';
 import { CustomerPlantAutocomplete } from '../components/CustomerPlantAutocomplete';
@@ -9,7 +9,12 @@ import { Wrench, Loader2, Calendar, Building2, AlertCircle, CheckCircle, Chevron
 
 export default function Repair() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+  
+  // เก็บ scroll position เมื่อ navigate ไปหน้า DetailRepair
+  const scrollPositionRef = useRef<number>(0);
+  const hasRestoredScrollRef = useRef<boolean>(false); // ป้องกันการ restore scroll ซ้ำ
   const [allMaintenanceRequests, setAllMaintenanceRequests] = useState<MaintenanceRequest[]>([]); // เก็บข้อมูลทั้งหมด
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]); // ข้อมูลที่แสดง (filtered + paginated)
   const [isLoading, setIsLoading] = useState(false);
@@ -34,34 +39,214 @@ export default function Repair() {
   const [activeTab, setActiveTab] = useState<'pending' | 'in_progress' | 'completed'>('pending');
   const [isSelectionMode, setIsSelectionMode] = useState(false); // โหมดเลือก card
   const [selectedRequestCodes, setSelectedRequestCodes] = useState<Set<string>>(new Set()); // เก็บ code ของ card ที่เลือก
-  const limit = 200;
+  const limit = 20; // สำหรับ client-side pagination
+  const apiLimit = 200; // ดึงข้อมูลทั้งหมดจาก API (max ที่ API รองรับ)
+  
+  // เก็บ filter params ก่อนหน้าเพื่อเช็คว่าเปลี่ยนหรือไม่
+  const prevFiltersRef = useRef<string>('');
+  const isLoadingRef = useRef<boolean>(false); // ป้องกันการเรียก API ซ้ำ
+  const cacheKeyRef = useRef<string>(''); // เก็บ cache key ปัจจุบัน
+  const hasCheckedCacheRef = useRef<boolean>(false); // ป้องกันการเช็ค cache ซ้ำในรอบเดียวกัน
 
-  // ดึง API เฉพาะเมื่อ filter อื่นๆ เปลี่ยน (ไม่ใช่เมื่อพิมพ์ search ทุกตัวอักษร)
-  useEffect(() => {
-    if (user?.username) {
-      loadMaintenanceRequests();
+  // Restore scroll position และ currentPage เมื่อกลับมาจาก DetailRepair (ใช้ useLayoutEffect เพื่อ restore ก่อน paint)
+  useLayoutEffect(() => {
+    const isReturningFromDetail = location.state?.fromDetailRepair || sessionStorage.getItem('returningFromDetailRepair') === 'true';
+    
+    // ทำงานเฉพาะเมื่อกลับมาจาก DetailRepair และยังไม่ได้ restore
+    if (!isReturningFromDetail || hasRestoredScrollRef.current) {
+      return;
     }
-  }, [user, selectedCustomer, selectedPlant, selectedIsBroken, selectedTruckplate, selectedDateStart, selectedDateEnd, searchCodeApplied, searchVehicleApplied, sortOrder]);
-
-  // Filter และ paginate จากข้อมูลที่มีอยู่แล้วเมื่อเปลี่ยน tab หรือหน้า
+    
+    // รอให้ data render เสร็จก่อน restore scroll
+    if (allMaintenanceRequests.length === 0) {
+      return;
+    }
+    
+    // Clear flag
+    sessionStorage.removeItem('returningFromDetailRepair');
+    
+    // Restore currentPage ถ้ามี
+    const savedPage = sessionStorage.getItem('repairCurrentPage');
+    if (savedPage) {
+      const page = parseInt(savedPage, 10);
+      sessionStorage.removeItem('repairCurrentPage');
+      setCurrentPage(page);
+    }
+    
+    // Restore scroll position ทันที (useLayoutEffect ทำงานก่อน paint)
+    const savedScroll = sessionStorage.getItem('repairScrollPosition');
+    if (savedScroll) {
+      const scrollPos = parseInt(savedScroll, 10);
+      sessionStorage.removeItem('repairScrollPosition');
+      hasRestoredScrollRef.current = true;
+      
+      // Scroll ทันทีก่อนที่ browser จะ paint
+      requestAnimationFrame(() => {
+        window.scrollTo({
+          top: scrollPos,
+          behavior: 'instant'
+        });
+      });
+    }
+  }, [location.state, allMaintenanceRequests.length]);
+  
+  // Reset restore flag เมื่อ navigate ไป DetailRepair
   useEffect(() => {
-    applyFilterAndPagination();
-  }, [allMaintenanceRequests, activeTab, currentPage, sortOrder]);
+    if (location.pathname.startsWith('/repair/') && location.pathname !== '/repair') {
+      hasRestoredScrollRef.current = false;
+    }
+  }, [location.pathname]);
 
-  const loadMaintenanceRequests = async () => {
+  // ดึง API เมื่อ filter เปลี่ยน (ไม่เรียกเมื่อเปลี่ยนหน้า - ใช้ client-side pagination)
+  useEffect(() => {
     if (!user?.username) {
       return;
     }
 
+    // สร้าง key จาก filter params ทั้งหมด
+    const filterKey = JSON.stringify({
+      username: user.username,
+      selectedCustomer,
+      selectedPlant,
+      selectedIsBroken,
+      selectedTruckplate,
+      selectedDateStart,
+      selectedDateEnd,
+      searchCodeApplied,
+      searchVehicleApplied,
+    });
+
+    // เช็คว่า filter เปลี่ยนจริงๆ หรือไม่ (ไม่ใช่แค่ re-render)
+    const isReturningFromDetail = location.state?.fromDetailRepair || sessionStorage.getItem('returningFromDetailRepair') === 'true';
+    
+    // เช็ค cache จาก sessionStorage (มี TTL 5 นาที)
+    const cacheKey = `repair_cache_${filterKey}`;
+    const cacheTimestampKey = `repair_cache_timestamp_${filterKey}`;
+    const CACHE_TTL = 5 * 60 * 1000; // 5 นาที (milliseconds)
+    
+    const cachedData = sessionStorage.getItem(cacheKey);
+    const cachedTimestamp = sessionStorage.getItem(cacheTimestampKey);
+    
+    // เช็คว่า cache หมดอายุหรือไม่
+    let isCacheValid = false;
+    if (cachedData && cachedTimestamp) {
+      const timestamp = parseInt(cachedTimestamp, 10);
+      const now = Date.now();
+      if (now - timestamp < CACHE_TTL) {
+        isCacheValid = true;
+      } else {
+        // Cache หมดอายุแล้ว → ลบ cache
+        sessionStorage.removeItem(cacheKey);
+        sessionStorage.removeItem(cacheTimestampKey);
+      }
+    }
+    
+    // Reset flag เมื่อ filter key เปลี่ยน
+    if (prevFiltersRef.current !== filterKey) {
+      hasCheckedCacheRef.current = false;
+    }
+    
+    // ป้องกันการเช็คซ้ำในรอบเดียวกัน (เฉพาะเมื่อ filter key เหมือนเดิม)
+    if (prevFiltersRef.current === filterKey && hasCheckedCacheRef.current) {
+      return;
+    }
+    
+    // Mark ว่าเช็คแล้ว (เฉพาะเมื่อ filter key เหมือนเดิม)
+    if (prevFiltersRef.current === filterKey) {
+      hasCheckedCacheRef.current = true;
+    }
+
+    // Priority 1: ถ้าเป็น navigation กลับมาจาก DetailRepair → เช็ค cache และ state ก่อน
+    if (isReturningFromDetail) {
+      sessionStorage.removeItem('returningFromDetailRepair');
+      
+      // ถ้ามีข้อมูลอยู่แล้วใน state และ filter key ตรงกัน → ไม่ต้องเรียก API
+      if (prevFiltersRef.current === filterKey && allMaintenanceRequests.length > 0) {
+        console.log('[Repair] Returning from DetailRepair - Using existing state, skip API');
+        return;
+      }
+      
+      // ถ้ามี cache และยังไม่หมดอายุ → ใช้ cache แทนการเรียก API
+      if (cachedData && isCacheValid) {
+        try {
+          const parsed = JSON.parse(cachedData);
+          console.log('[Repair] Returning from DetailRepair - Using cache, skip API');
+          setAllMaintenanceRequests(parsed);
+          prevFiltersRef.current = filterKey;
+          cacheKeyRef.current = filterKey;
+          return;
+        } catch (e) {
+          sessionStorage.removeItem(cacheKey);
+          sessionStorage.removeItem(cacheTimestampKey);
+        }
+      }
+      
+      // ถ้ามีข้อมูลอยู่แล้วใน state (แม้ filter key ไม่ตรง) → ไม่ต้องเรียก API
+      if (allMaintenanceRequests.length > 0) {
+        console.log('[Repair] Returning from DetailRepair - Has data in state, skip API');
+        return;
+      }
+    }
+    
+    // Priority 2: ถ้ามีข้อมูลอยู่แล้วใน state และ filter key ตรงกัน → ไม่ต้องเรียก API
+    if (prevFiltersRef.current === filterKey && allMaintenanceRequests.length > 0) {
+      console.log('[Repair] Filter unchanged, has data, skip API');
+      return;
+    }
+
+    // Priority 3: ถ้ามี cache และยังไม่หมดอายุ → ใช้ cache แทนการเรียก API
+    if (cachedData && isCacheValid) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        console.log('[Repair] Using cache, skip API');
+        setAllMaintenanceRequests(parsed);
+        prevFiltersRef.current = filterKey;
+        cacheKeyRef.current = filterKey;
+        return;
+      } catch (e) {
+        sessionStorage.removeItem(cacheKey);
+        sessionStorage.removeItem(cacheTimestampKey);
+      }
+    }
+
+    // ป้องกันการเรียก API ซ้ำ (ถ้ากำลังโหลดอยู่แล้ว)
+    if (isLoadingRef.current) {
+      console.log('[Repair] Already loading, skip API');
+      return;
+    }
+
+    // อัปเดต filter key และเรียก API
+    console.log('[Repair] Calling API - filterKey:', filterKey.substring(0, 50));
+    prevFiltersRef.current = filterKey;
+    cacheKeyRef.current = filterKey;
+    loadMaintenanceRequests(filterKey);
+  }, [user, selectedCustomer, selectedPlant, selectedIsBroken, selectedTruckplate, selectedDateStart, selectedDateEnd, searchCodeApplied, searchVehicleApplied]);
+
+  // Filter และ paginate จากข้อมูลที่ดึงมาแล้วเมื่อเปลี่ยน tab, sort, หรือหน้า
+  useEffect(() => {
+    applyFilterAndPagination();
+  }, [allMaintenanceRequests, activeTab, sortOrder, currentPage]);
+
+  const loadMaintenanceRequests = async (filterKeyForCache?: string) => {
+    if (!user?.username) {
+      return;
+    }
+
+    // ป้องกันการเรียก API ซ้ำ
+    if (isLoadingRef.current) {
+      return;
+    }
+
+    isLoadingRef.current = true;
     setIsLoading(true);
     setError('');
 
     try {
-      // Build request object
+      // Build request object - ดึงข้อมูลทั้งหมด (limit สูงสุด) เพื่อ filter และ paginate client-side
       const requestParams: any = {
         flow: ['แจ้งซ่อม', 'ขอเปลี่ยนยาง'],
-        limit,
-        offset: currentPage * limit,
+        limit: apiLimit, // ดึงข้อมูลทั้งหมด (max 200)
+        offset: 0, // เริ่มจากหน้าแรกเสมอ
       };
 
       // Check if user is master - if yes, send get_all=true and skip mechanic_name filter
@@ -102,24 +287,29 @@ export default function Repair() {
         requestParams.search_vehicle = searchVehicleApplied.trim();
       }
 
-      // If no filters are selected, use default date range (7 days ago to today)
-      const hasAnyFilter = selectedCustomer || selectedPlant || selectedIsBroken !== null || selectedTruckplate.trim() || selectedDateStart || selectedDateEnd || searchCodeApplied.trim() || searchVehicleApplied.trim();
-      if (!hasAnyFilter) {
-        // Default: Calculate date range (7 days ago to today)
-        const today = new Date();
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(today.getDate() - 7);
-
-        requestParams.datestart = sevenDaysAgo.toISOString().split('T')[0];
-        requestParams.dateend = today.toISOString().split('T')[0];
-      }
+      // ไม่ตั้งค่า default date range แล้ว - ดึงข้อมูลทั้งหมดตาม limit/offset
+      // API จะกรองเฉพาะที่ยังไม่ปิด (close_at IS NULL) ตาม default behavior
 
       const response = await menaFixerService.queryMaintenanceRequest(requestParams);
 
-      // เก็บข้อมูลทั้งหมดไว้ (ไม่ filter ตาม tab)
+      // เก็บข้อมูลทั้งหมดที่ดึงมา (จะ filter และ paginate ใน applyFilterAndPagination)
       setAllMaintenanceRequests(response.data);
       
-      // Reset pagination เมื่อดึงข้อมูลใหม่
+      // เก็บ cache ใน sessionStorage พร้อม timestamp (ถ้ามี filterKeyForCache)
+      if (filterKeyForCache) {
+        try {
+          const cacheKey = `repair_cache_${filterKeyForCache}`;
+          const cacheTimestampKey = `repair_cache_timestamp_${filterKeyForCache}`;
+          sessionStorage.setItem(cacheKey, JSON.stringify(response.data));
+          sessionStorage.setItem(cacheTimestampKey, Date.now().toString());
+          console.log('[Repair] Cached data with TTL 5 minutes');
+        } catch (e) {
+          // ถ้า sessionStorage เต็ม ให้ลบ cache เก่า
+          console.warn('Failed to cache data:', e);
+        }
+      }
+      
+      // Reset หน้าเป็น 0 เมื่อดึงข้อมูลใหม่
       setCurrentPage(0);
     } catch (error: any) {
       console.error('Error loading maintenance requests:', error);
@@ -128,10 +318,11 @@ export default function Repair() {
       setMaintenanceRequests([]);
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   };
 
-  // Filter และ paginate จากข้อมูลที่มีอยู่แล้ว
+  // Filter จากข้อมูลที่ดึงมาแล้ว (client-side filter ตาม tab)
   const applyFilterAndPagination = () => {
     if (allMaintenanceRequests.length === 0) {
       setMaintenanceRequests([]);
@@ -172,20 +363,19 @@ export default function Repair() {
       const dateB = b.schedule_at ? new Date(b.schedule_at).getTime() : 0;
       return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
     });
-
-    // Apply pagination to filtered data
+    
+    // Paginate จาก filtered data (client-side pagination)
+    const filteredCount = sortedData.length;
+    const filteredTotalPages = Math.ceil(filteredCount / limit) || 1;
     const startIndex = currentPage * limit;
     const endIndex = startIndex + limit;
     const paginatedData = sortedData.slice(startIndex, endIndex);
     
     setMaintenanceRequests(paginatedData);
-    // Update total count based on filtered data
-    setTotalCount(filteredData.length);
-    // Calculate pagination for filtered data
-    const filteredTotalPages = Math.ceil(filteredData.length / limit) || 1;
-    setHasNext(endIndex < filteredData.length);
-    setHasPrev(currentPage > 0);
+    setTotalCount(filteredCount);
     setTotalPages(filteredTotalPages);
+    setHasNext(endIndex < filteredCount);
+    setHasPrev(currentPage > 0);
     // ไม่ดึง maintenance-tasks ที่ Repair - จะดึงเมื่อไป DetailRepair หรือ RepairSummary แทน
   };
 
@@ -218,7 +408,8 @@ export default function Repair() {
   };
 
   const handlePageClick = (page: number) => {
-    setCurrentPage(page);
+    // page is 1-based from UI, convert to 0-based for state
+    setCurrentPage(page - 1);
   };
 
   const getPageNumbers = (): number[] => {
@@ -273,7 +464,12 @@ export default function Repair() {
         return newSet;
       });
     } else {
-    navigate(`/repair/${requestCode}`);
+      // เก็บ currentPage และ scroll position ก่อน navigate (ใช้ sessionStorage เพื่อ persist)
+      const scrollPos = window.scrollY;
+      scrollPositionRef.current = scrollPos;
+      sessionStorage.setItem('repairCurrentPage', currentPage.toString());
+      sessionStorage.setItem('repairScrollPosition', scrollPos.toString());
+      navigate(`/repair/${requestCode}`);
     }
   };
 
@@ -963,7 +1159,7 @@ export default function Repair() {
                     {getPageNumbers().map((page) => (
                       <button
                         key={page}
-                        onClick={() => handlePageClick(page - 1)}
+                        onClick={() => handlePageClick(page)}
                         disabled={isLoading}
                         className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                           currentPage + 1 === page

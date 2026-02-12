@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { menaFixerService, MaintenanceTasksResponse, RepairRecordsByRequestResponse, MaintenanceRepairRecordsResponse, MaintenanceRepairRecordUpdateResponse } from '../services/mena-fixer.service';
@@ -27,17 +27,38 @@ export default function DetailRepair() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [existingRecords, setExistingRecords] = useState<RepairRecordsByRequestResponse | null>(null);
+  
+  // ป้องกันการเรียก API ซ้ำ
+  const isLoadingTasksRef = useRef<boolean>(false);
+  const isLoadingRecordsRef = useRef<boolean>(false);
+  const loadedCodeRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (code) {
-      loadMaintenanceTasks();
-      loadExistingRepairRecords();
+    if (!code) return;
+    
+    // Scroll ไปข้างบนเมื่อเข้า page
+    window.scrollTo(0, 0);
+    
+    // เช็คว่า code เปลี่ยนจริงๆ หรือไม่ (ไม่ใช่แค่ re-render)
+    if (loadedCodeRef.current === code) {
+      return;
     }
+
+    // อัปเดต loaded code และเรียก API
+    loadedCodeRef.current = code;
+    loadMaintenanceTasks();
+    loadExistingRepairRecords();
   }, [code]);
 
   const loadMaintenanceTasks = async () => {
     if (!code) return;
 
+    // ป้องกันการเรียก API ซ้ำ
+    if (isLoadingTasksRef.current) {
+      return;
+    }
+
+    isLoadingTasksRef.current = true;
     setIsLoading(true);
     setError('');
 
@@ -65,11 +86,19 @@ export default function DetailRepair() {
       setMaintenanceTasks(null);
     } finally {
       setIsLoading(false);
+      isLoadingTasksRef.current = false;
     }
   };
 
   const loadExistingRepairRecords = async () => {
     if (!code) return;
+
+    // ป้องกันการเรียก API ซ้ำ
+    if (isLoadingRecordsRef.current) {
+      return;
+    }
+
+    isLoadingRecordsRef.current = true;
 
     try {
       const records = await menaFixerService.getRepairRecordsByRequest(code);
@@ -106,6 +135,8 @@ export default function DetailRepair() {
     } catch (error: any) {
       console.error('Error loading existing repair records:', error);
       // Don't show error for this, as it's optional data
+    } finally {
+      isLoadingRecordsRef.current = false;
     }
   };
 
@@ -426,7 +457,11 @@ export default function DetailRepair() {
           {/* Header */}
           <div className="flex items-center gap-3 mb-6">
             <button
-              onClick={() => navigate('/repair')}
+              onClick={() => {
+                // เก็บ flag ใน sessionStorage เพื่อให้ persist เมื่อ component re-mount
+                sessionStorage.setItem('returningFromDetailRepair', 'true');
+                navigate('/repair', { state: { fromDetailRepair: true } });
+              }}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-6 h-6 text-gray-600 dark:text-gray-400" />

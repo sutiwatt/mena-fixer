@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -12,6 +13,13 @@ import Photo from './pages/Photo';
 import Layout from './components/Layout';
 
 function App() {
+  // Disable browser scroll restoration เพื่อให้เราจัดการเอง
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+  }, []);
+
   return (
     <AuthProvider>
       <BrowserRouter>
